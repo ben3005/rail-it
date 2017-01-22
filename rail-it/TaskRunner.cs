@@ -7,22 +7,33 @@ namespace rail_it
 {
 	public class TaskRunner
 	{
-		public static void runTask(Action theMethod, int totalRuns = 1, int threads = 1)
+		private readonly TaskScheduler currentScheduler;
+		private readonly TaskFactory taskFactory;
+		private readonly CancellationTokenSource cts;
+		private readonly object lockObj;
+		public TaskRunner()
 		{
-			if (totalRuns <= 0)
-			{
-				throw new ArgumentException("Task must run at least once");
-			}
-			if (threads <= 0)
-			{
-				throw new ArgumentException("Task must run on at least one thread");
-			}
+			currentScheduler = TaskScheduler.Current;
+			taskFactory = new TaskFactory(currentScheduler);
+			cts = new CancellationTokenSource();
+			lockObj = new object();
+		}
 
-			var currentScheduler = new LimitedConcurrencyLevelTaskScheduler(threads);
-			var taskFactory = new TaskFactory(currentScheduler);
-			CancellationTokenSource cts = new CancellationTokenSource();
+		public TaskRunner(int maxConcurrency)
+		{
+			if (maxConcurrency < 1)
+			{
+				throw new ArgumentException("Maximum concurrency cannot be less than 1", "maxConcurrency");
+			}
+			currentScheduler = new LimitedConcurrencyLevelTaskScheduler(maxConcurrency);
+			taskFactory = new TaskFactory(currentScheduler);
+			cts = new CancellationTokenSource();
+			lockObj = new object();
+		}
+		public void runTask(Action theMethod, int totalRuns = 1)
+		{
+			validateParameters(totalRuns);
 
-			object lockObj = new object();
 			List<Task> tasks = new List<Task>();
 			for (int j = 0; j < totalRuns; j++)
 			{
@@ -32,6 +43,30 @@ namespace rail_it
 				}
 			}
 			Task.WaitAll(tasks.ToArray());
+		}
+
+		public void runTask(Action<int> theMethod, int totalRuns = 1)
+		{
+			validateParameters(totalRuns);
+
+			List<Task> tasks = new List<Task>();
+			for (int i = 0; i < totalRuns; i++)
+			{
+				var currTask = i + 1;
+				lock (lockObj)
+				{
+					tasks.Add(taskFactory.StartNew(() => theMethod(currTask), cts.Token));
+				}
+			}
+			Task.WaitAll(tasks.ToArray());
+		}
+
+		private void validateParameters(int totalRuns)
+		{
+			if (totalRuns <= 0)
+			{
+				throw new ArgumentException("Task must run at least once");
+			}
 		}
 	}
 }

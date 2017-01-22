@@ -7,13 +7,14 @@ namespace rail_it
 	{
 		static void Main(string[] args)
 		{
-			TaskRunner.runTask(tmpTask, 20, 4);
+			var taskRunner = new TaskRunner();
+			taskRunner.runTask(tmpTask, 20);
 			Console.ReadKey();
 		}
 
-		static void tmpTask()
+		static void tmpTask(int runNumber)
 		{
-			Console.WriteLine("task running on thread {0} ", Thread.CurrentThread.ManagedThreadId);
+			Console.WriteLine("run number:{0} running on thread {1} ", runNumber, Thread.CurrentThread.ManagedThreadId);
 		}
 	}
 }
